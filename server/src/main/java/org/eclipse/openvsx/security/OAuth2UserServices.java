@@ -16,6 +16,8 @@ import org.eclipse.openvsx.eclipse.EclipseService;
 import org.eclipse.openvsx.entities.UserData;
 import org.eclipse.openvsx.repositories.RepositoryService;
 import org.eclipse.openvsx.util.ErrorResultException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
@@ -40,6 +42,7 @@ import static org.eclipse.openvsx.security.CodedAuthException.*;
 @Service
 public class OAuth2UserServices {
 
+    private static final Logger log = LoggerFactory.getLogger(OAuth2UserServices.class);
     private final UserService users;
     private final TokenService tokens;
     private final RepositoryService repositories;
@@ -106,8 +109,16 @@ public class OAuth2UserServices {
             case "eclipse":
                 return loadEclipseUser(userRequest);
             default:
-                throw new CodedAuthException("Unsupported registration: " + registrationId, UNSUPPORTED_REGISTRATION);
+                //throw new CodedAuthException("Unsupported registration: " + registrationId, UNSUPPORTED_REGISTRATION);
+                return loadGenericUser(registrationId, userRequest);
         }
+    }
+
+    private IdPrincipal loadGenericUser(String registrationId, OAuth2UserRequest userRequest) {
+        log.debug("Authorization for registration {} with request {}", registrationId, userRequest);
+        var authUser = delegate.loadUser(userRequest);
+        authUser.getAttributes().forEach((k, v) -> log.debug("User: {} = {}", k, v));
+        return new IdPrincipal(1234, "foobar", Collections.emptyList());
     }
 
     private IdPrincipal loadGitHubUser(OAuth2UserRequest userRequest) {

@@ -26,9 +26,11 @@ import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2LoginAuthenticationToken;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -115,10 +117,23 @@ public class OAuth2UserServices {
     }
 
     private IdPrincipal loadGenericUser(String registrationId, OAuth2UserRequest userRequest) {
-        log.debug("Authorization for registration {} with request {}", registrationId, userRequest);
+        log.debug("Authorization for registration {}", registrationId);
+        OAuth2AccessToken accessToken = userRequest.getAccessToken();
+        log.debug("Access token {}, scopes = {}", accessToken.getTokenType().getValue(), accessToken.getScopes());
         var authUser = delegate.loadUser(userRequest);
+        log.debug("User name: {}", authUser.getName());
         authUser.getAttributes().forEach((k, v) -> log.debug("User: {} = {}", k, v));
-        return new IdPrincipal(1234, "foobar", Collections.emptyList());
+        authUser.getAuthorities().forEach(k -> log.debug("Authority: {}", k));
+        var userData = repositories.findUserByLoginName(registrationId, authUser.getName());
+        if (userData == null) {
+            log.debug("User not found, creating ...");
+            userData = users.registerNewUser(registrationId, authUser);
+        } else {
+            log.debug("Updating existing user...");
+            userData = users.updateExistingUser(userData, authUser);
+        }
+        log.debug("User: {}", userData);
+        return new IdPrincipal(userData.getId(), authUser.getName(), getAuthorities(userData));
     }
 
     private IdPrincipal loadGitHubUser(OAuth2UserRequest userRequest) {

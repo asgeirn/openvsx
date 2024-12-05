@@ -920,7 +920,7 @@ class VSCodeAPITest {
                 CacheService cache,
                 ExtensionValidator validator
         ) {
-            return new UserService(entityManager, repositories, storageUtil, cache, validator);
+            return pnew UserService(entityManager, repositories, storageUtil, cache, validator);
         }
 
         @Bean

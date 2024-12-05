@@ -28,6 +28,7 @@ import org.eclipse.openvsx.json.NamespaceDetailsJson;
 import org.eclipse.openvsx.json.ResultJson;
 import org.eclipse.openvsx.repositories.RepositoryService;
 import org.eclipse.openvsx.security.IdPrincipal;
+import org.eclipse.openvsx.security.PropertyReader;
 import org.eclipse.openvsx.storage.StorageUtilService;
 import org.eclipse.openvsx.util.*;
 import org.springframework.cache.annotation.CacheEvict;
@@ -52,19 +53,21 @@ public class UserService {
     private final StorageUtilService storageUtil;
     private final CacheService cache;
     private final ExtensionValidator validator;
+    private final PropertyReader propertyReader;
 
     public UserService(
             EntityManager entityManager,
             RepositoryService repositories,
             StorageUtilService storageUtil,
             CacheService cache,
-            ExtensionValidator validator
+            ExtensionValidator validator, PropertyReader propertyReader
     ) {
         this.entityManager = entityManager;
         this.repositories = repositories;
         this.storageUtil = storageUtil;
         this.cache = cache;
         this.validator = validator;
+        this.propertyReader = propertyReader;
     }
 
     public UserData findLoggedInUser() {
@@ -76,6 +79,20 @@ public class UserService {
             }
         }
         return null;
+    }
+
+    @Transactional
+    public UserData registerNewUser(String provider, OAuth2User oauth2User) {
+        var user = new UserData();
+        user.setProvider(provider);
+        user.setAuthId(oauth2User.getName());
+        propertyReader.getUserAttribute(provider, "login", oauth2User).ifPresent(user::setLoginName);
+        propertyReader.getUserAttribute(provider, "name", oauth2User).ifPresent(user::setFullName);
+        propertyReader.getUserAttribute(provider, "email", oauth2User).ifPresent(user::setEmail);
+        propertyReader.getUserAttribute(provider, "profile", oauth2User).ifPresent(user::setProviderUrl);
+        propertyReader.getUserAttribute(provider, "avatar", oauth2User).ifPresent(user::setAvatarUrl);
+        entityManager.persist(user);
+        return user;
     }
 
     @Transactional
@@ -311,4 +328,5 @@ public class UserService {
         token.setActive(false);
         return ResultJson.success("Deleted access token for user " + user.getLoginName() + ".");
     }
+
 }

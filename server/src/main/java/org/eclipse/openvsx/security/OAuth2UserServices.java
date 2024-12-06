@@ -11,6 +11,7 @@ package org.eclipse.openvsx.security;
 
 import jakarta.persistence.EntityManager;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.eclipse.openvsx.UserService;
 import org.eclipse.openvsx.eclipse.EclipseService;
 import org.eclipse.openvsx.entities.UserData;
@@ -136,7 +137,9 @@ public class OAuth2UserServices {
             log.debug("Updating existing user...");
             userData = users.updateExistingUser(userData, authUser);
         }
-        log.debug("User: {}", userData);
+        if (log.isDebugEnabled()) {
+            log.debug("User: {}", ToStringBuilder.reflectionToString(userData));
+        }
         return new IdPrincipal(userData.getId(), authUser.getName(), getAuthorities(userData));
     }
 

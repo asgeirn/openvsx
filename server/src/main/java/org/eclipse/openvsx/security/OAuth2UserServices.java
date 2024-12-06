@@ -26,7 +26,6 @@ import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2LoginAuthenticationToken;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
-import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
@@ -50,6 +49,7 @@ public class OAuth2UserServices {
     private final RepositoryService repositories;
     private final EntityManager entityManager;
     private final EclipseService eclipse;
+    private final PropertyReader propertyReader;
     private final DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
     private final OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2;
     private final OAuth2UserService<OidcUserRequest, OidcUser> oidc;
@@ -59,13 +59,15 @@ public class OAuth2UserServices {
             TokenService tokens,
             RepositoryService repositories,
             EntityManager entityManager,
-            EclipseService eclipse
+            EclipseService eclipse,
+            PropertyReader propertyReader
     ) {
         this.users = users;
         this.tokens = tokens;
         this.repositories = repositories;
         this.entityManager = entityManager;
         this.eclipse = eclipse;
+        this.propertyReader = propertyReader;
         this.oauth2 = new OAuth2UserService<OAuth2UserRequest, OAuth2User>() {
             @Override
             public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
@@ -121,10 +123,12 @@ public class OAuth2UserServices {
         OAuth2AccessToken accessToken = userRequest.getAccessToken();
         log.debug("Access token {}, scopes = {}", accessToken.getTokenType().getValue(), accessToken.getScopes());
         var authUser = delegate.loadUser(userRequest);
+        String loginName = propertyReader.getUserAttribute(registrationId, "login", authUser)
+                .orElseThrow(() -> new CodedAuthException("Invalid login; user name attribute not found", INVALID_GITHUB_USER));
         log.debug("User name: {}", authUser.getName());
         authUser.getAttributes().forEach((k, v) -> log.debug("User: {} = {}", k, v));
         authUser.getAuthorities().forEach(k -> log.debug("Authority: {}", k));
-        var userData = repositories.findUserByLoginName(registrationId, authUser.getName());
+        var userData = repositories.findUserByLoginName(registrationId, loginName);
         if (userData == null) {
             log.debug("User not found, creating ...");
             userData = users.registerNewUser(registrationId, authUser);
